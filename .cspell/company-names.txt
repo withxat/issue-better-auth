@@ -18,6 +18,7 @@ surrealdb
 attio
 instantdb
 faceit
+Feishu
 xata
 chonkie
 dsari

@@ -1,0 +1,78 @@
+---
+title: Feishu / Lark
+description: Feishu and Lark provider setup and usage.
+---
+
+<Steps>
+  <Step>
+    ### Get your Feishu or Lark Credentials
+
+    To use Feishu or Lark sign in, create an app in the relevant developer console, configure the OAuth redirect URL for your Better Auth callback, and get your App ID and App Secret.
+  </Step>
+
+  <Step>
+    ### Configure the provider
+
+    Use `feishu` for Feishu China endpoints and `lark` for Lark global endpoints.
+
+    ```ts title="auth.ts"
+    import { betterAuth } from "better-auth"
+
+    export const auth = betterAuth({
+        socialProviders: {
+            feishu: { // [!code highlight]
+                clientId: process.env.FEISHU_CLIENT_ID, // [!code highlight]
+                clientSecret: process.env.FEISHU_CLIENT_SECRET, // [!code highlight]
+            }, // [!code highlight]
+            lark: { // [!code highlight]
+                clientId: process.env.LARK_CLIENT_ID, // [!code highlight]
+                clientSecret: process.env.LARK_CLIENT_SECRET, // [!code highlight]
+            }, // [!code highlight]
+        },
+    })
+    ```
+
+    #### Optional Configuration
+
+    You can pass OAuth scopes when you need to request specific user permissions.
+
+    ```ts title="auth.ts"
+    export const auth = betterAuth({
+        socialProviders: {
+            feishu: {
+                clientId: process.env.FEISHU_CLIENT_ID,
+                clientSecret: process.env.FEISHU_CLIENT_SECRET,
+                scope: ["contact:user.email"],
+            },
+        },
+    })
+    ```
+  </Step>
+
+  <Step>
+    ### Sign In with Feishu or Lark
+
+    ```ts title="auth-client.ts"
+    import { createAuthClient } from "better-auth/client"
+    const authClient = createAuthClient()
+
+    const signInWithFeishu = async () => {
+        await authClient.signIn.social({
+            provider: "feishu"
+        })
+    }
+
+    const signInWithLark = async () => {
+        await authClient.signIn.social({
+            provider: "lark"
+        })
+    }
+    ```
+  </Step>
+</Steps>
+
+## Usage
+
+Feishu and Lark use different regional OAuth domains. The `feishu` provider uses `accounts.feishu.cn` and `open.feishu.cn`; the `lark` provider uses `accounts.larksuite.com` and `open.larksuite.com`.
+
+Feishu/Lark user information can include `email` or `enterprise_email` depending on granted permissions. Better Auth maps either email field to the user email and leaves `emailVerified` as `false`.

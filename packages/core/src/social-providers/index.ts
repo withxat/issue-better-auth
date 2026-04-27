@@ -6,6 +6,7 @@ import { cognito } from "./cognito";
 import { discord } from "./discord";
 import { dropbox } from "./dropbox";
 import { facebook } from "./facebook";
+import { feishu, lark } from "./feishu";
 import { figma } from "./figma";
 import { github } from "./github";
 import { gitlab } from "./gitlab";
@@ -42,6 +43,7 @@ export const socialProviders = {
 	cognito,
 	discord,
 	facebook,
+	feishu,
 	figma,
 	github,
 	microsoft,
@@ -53,6 +55,7 @@ export const socialProviders = {
 	twitter,
 	dropbox,
 	kick,
+	lark,
 	linear,
 	linkedin,
 	gitlab,
@@ -99,6 +102,7 @@ export * from "./cognito";
 export * from "./discord";
 export * from "./dropbox";
 export * from "./facebook";
+export * from "./feishu";
 export * from "./figma";
 export * from "./github";
 export * from "./gitlab";

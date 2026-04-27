@@ -3,6 +3,7 @@ import type { GenericEndpointContext } from "@better-auth/core";
 import { runWithEndpointContext } from "@better-auth/core/context";
 import { refreshAccessToken } from "@better-auth/core/oauth2";
 import type {
+	FeishuProfile,
 	GoogleProfile,
 	MicrosoftEntraIDProfile,
 	RailwayProfile,
@@ -2224,6 +2225,280 @@ describe("Microsoft Provider", async () => {
 
 		expect(res.data?.url).toContain("public-ms-client");
 		expect(res.data?.redirect).toBe(true);
+	});
+});
+
+describe("Feishu/Lark Providers", async () => {
+	beforeAll(() => {
+		mswServer.use(
+			http.post(
+				"https://open.feishu.cn/open-apis/authen/v2/oauth/token",
+				async ({ request }) => {
+					const body = (await request.json()) as Record<string, string>;
+					expect(body.client_id).toBe("feishu-test-client-id");
+					expect(body.client_secret).toBe("feishu-test-client-secret");
+
+					if (body.grant_type === "refresh_token") {
+						expect(body.refresh_token).toBe("feishu_refresh_token");
+						return HttpResponse.json({
+							code: 0,
+							access_token: "feishu_refreshed_access_token",
+							refresh_token: "feishu_refreshed_refresh_token",
+							refresh_token_expires_in: 7200,
+							token_type: "Bearer",
+							expires_in: 3600,
+							scope: "contact:user.email",
+						});
+					}
+
+					expect(body.grant_type).toBe("authorization_code");
+					expect(body.code).toBe("feishu_test_code");
+					expect(body.redirect_uri).toBeDefined();
+					expect(body.code_verifier).not.toBe("");
+
+					return HttpResponse.json({
+						code: 0,
+						access_token: "feishu_access_token",
+						refresh_token: "feishu_refresh_token",
+						refresh_token_expires_in: 7200,
+						token_type: "Bearer",
+						expires_in: 3600,
+						scope: "contact:user.email contact:user.employee_id",
+					});
+				},
+			),
+			http.get(
+				"https://open.feishu.cn/open-apis/authen/v1/user_info",
+				async ({ request }) => {
+					expect(request.headers.get("authorization")).toBe(
+						"Bearer feishu_access_token",
+					);
+					return HttpResponse.json({
+						code: 0,
+						data: {
+							name: "Feishu User",
+							en_name: "Feishu EN",
+							avatar_url: "https://example.com/feishu-avatar.png",
+							avatar_thumb: "https://example.com/feishu-avatar-thumb.png",
+							open_id: "ou_feishu_user_123",
+							union_id: "on_feishu_user_123",
+							email: "feishu@test.com",
+						},
+					} satisfies FeishuProfile);
+				},
+			),
+			http.post(
+				"https://open.larksuite.com/open-apis/authen/v2/oauth/token",
+				async ({ request }) => {
+					const body = (await request.json()) as Record<string, string>;
+					expect(body.client_id).toBe("lark-test-client-id");
+					expect(body.client_secret).toBe("lark-test-client-secret");
+					expect(body.grant_type).toBe("authorization_code");
+
+					return HttpResponse.json({
+						code: 0,
+						data: {
+							access_token: "lark_access_token",
+							token_type: "Bearer",
+							expires_in: 3600,
+						},
+					});
+				},
+			),
+			http.get(
+				"https://open.larksuite.com/open-apis/authen/v1/user_info",
+				async () => {
+					return HttpResponse.json({
+						code: 0,
+						data: {
+							name: "Lark User",
+							avatar_url: "https://example.com/lark-avatar.png",
+							open_id: "ou_lark_user_123",
+							enterprise_email: "lark@test.com",
+						},
+					} satisfies FeishuProfile);
+				},
+			),
+		);
+	});
+
+	it("should configure Feishu and Lark providers correctly", async () => {
+		const { auth } = await getTestInstance({
+			socialProviders: {
+				feishu: {
+					clientId: "feishu-test-client-id",
+					clientSecret: "feishu-test-client-secret",
+				},
+				lark: {
+					clientId: "lark-test-client-id",
+					clientSecret: "lark-test-client-secret",
+				},
+			},
+		});
+
+		const ctx = await auth.$context;
+		const feishuProvider = ctx.socialProviders.find((p) => p.id === "feishu");
+		const larkProvider = ctx.socialProviders.find((p) => p.id === "lark");
+
+		expect(feishuProvider?.name).toBe("Feishu");
+		expect(larkProvider?.name).toBe("Lark");
+	});
+
+	it("should initiate Feishu OAuth flow with configured scopes", async () => {
+		const { client } = await getTestInstance({
+			socialProviders: {
+				feishu: {
+					clientId: "feishu-test-client-id",
+					clientSecret: "feishu-test-client-secret",
+					scope: ["contact:user.email"],
+				},
+			},
+		});
+
+		const signInRes = await client.signIn.social({
+			provider: "feishu",
+			callbackURL: "/dashboard",
+		});
+
+		expect(signInRes.data).toBeDefined();
+		expect(signInRes.data?.url).toContain(
+			"accounts.feishu.cn/open-apis/authen/v1/authorize",
+		);
+		expect(signInRes.data?.redirect).toBe(true);
+
+		const authUrl = new URL(signInRes.data!.url!);
+		expect(authUrl.searchParams.get("client_id")).toBe("feishu-test-client-id");
+		expect(authUrl.searchParams.get("scope")).toBe("contact:user.email");
+		expect(authUrl.searchParams.get("code_challenge")).not.toBeNull();
+		expect(authUrl.searchParams.get("code_challenge_method")).toBe("S256");
+	});
+
+	it("should omit Feishu scope when no scopes are configured", async () => {
+		const { client } = await getTestInstance({
+			socialProviders: {
+				feishu: {
+					clientId: "feishu-test-client-id",
+					clientSecret: "feishu-test-client-secret",
+				},
+			},
+		});
+
+		const signInRes = await client.signIn.social({
+			provider: "feishu",
+			callbackURL: "/dashboard",
+		});
+
+		const authUrl = new URL(signInRes.data!.url!);
+		expect(authUrl.searchParams.has("scope")).toBe(false);
+	});
+
+	it("should initiate Lark OAuth flow against global endpoints", async () => {
+		const { client } = await getTestInstance({
+			socialProviders: {
+				lark: {
+					clientId: "lark-test-client-id",
+					clientSecret: "lark-test-client-secret",
+				},
+			},
+		});
+
+		const signInRes = await client.signIn.social({
+			provider: "lark",
+			callbackURL: "/dashboard",
+		});
+
+		expect(signInRes.data).toBeDefined();
+		expect(signInRes.data?.url).toContain(
+			"accounts.larksuite.com/open-apis/authen/v1/authorize",
+		);
+	});
+
+	it("should complete Feishu OAuth flow and create user", async () => {
+		const { client, cookieSetter, auth } = await getTestInstance(
+			{
+				socialProviders: {
+					feishu: {
+						clientId: "feishu-test-client-id",
+						clientSecret: "feishu-test-client-secret",
+					},
+				},
+			},
+			{
+				disableTestUser: true,
+			},
+		);
+
+		const headers = new Headers();
+		const signInRes = await client.signIn.social({
+			provider: "feishu",
+			callbackURL: "/dashboard",
+			newUserCallbackURL: "/welcome",
+			fetchOptions: {
+				onSuccess: cookieSetter(headers),
+			},
+		});
+
+		expect(signInRes.data).toBeDefined();
+		const state = new URL(signInRes.data!.url!).searchParams.get("state") || "";
+
+		await client.$fetch("/callback/feishu", {
+			query: {
+				state,
+				code: "feishu_test_code",
+			},
+			headers,
+			method: "GET",
+			onError(context) {
+				expect(context.response.status).toBe(302);
+				expect(context.response.headers.get("location")).toContain("/welcome");
+				cookieSetter(headers)({ response: context.response });
+			},
+		});
+
+		const session = await client.getSession({
+			fetchOptions: {
+				headers,
+			},
+		});
+
+		expect(session.data).toBeDefined();
+		expect(session.data?.user.email).toBe("feishu@test.com");
+		expect(session.data?.user.name).toBe("Feishu User");
+		expect(session.data?.user.image).toBe(
+			"https://example.com/feishu-avatar.png",
+		);
+		expect(session.data?.user.emailVerified).toBe(false);
+
+		const ctx = await auth.$context;
+		const accounts = await ctx.internalAdapter.findAccounts(
+			session.data?.user.id!,
+		);
+		expect(accounts).toHaveLength(1);
+		expect(accounts[0]?.providerId).toBe("feishu");
+		expect(accounts[0]?.accountId).toBe("on_feishu_user_123");
+	});
+
+	it("should refresh Feishu access tokens", async () => {
+		const { auth } = await getTestInstance({
+			socialProviders: {
+				feishu: {
+					clientId: "feishu-test-client-id",
+					clientSecret: "feishu-test-client-secret",
+				},
+			},
+		});
+
+		const ctx = await auth.$context;
+		const feishuProvider = ctx.socialProviders.find((p) => p.id === "feishu");
+		const refreshed = await feishuProvider?.refreshAccessToken?.(
+			"feishu_refresh_token",
+		);
+
+		expect(refreshed?.accessToken).toBe("feishu_refreshed_access_token");
+		expect(refreshed?.refreshToken).toBe("feishu_refreshed_refresh_token");
+		expect(refreshed?.scopes).toEqual(["contact:user.email"]);
+		expect(refreshed?.accessTokenExpiresAt).toBeInstanceOf(Date);
+		expect(refreshed?.refreshTokenExpiresAt).toBeInstanceOf(Date);
 	});
 });
 
