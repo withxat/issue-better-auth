@@ -27,3 +27,7 @@ Razorpay
 razorpay
 payu
 PayU
+Feishu
+feishu
+Lark
+lark
