@@ -30,7 +30,7 @@ describe("Feishu/Lark generic OAuth provider helpers", () => {
 		const feishuProvider = feishu({
 			clientId: "feishu-client-id",
 			clientSecret: "feishu-client-secret",
-			scopes: ["contact:user.email"],
+			scopes: ["contact:user.email:readonly"],
 		});
 		const larkProvider = lark({
 			clientId: "lark-client-id",
@@ -46,7 +46,7 @@ describe("Feishu/Lark generic OAuth provider helpers", () => {
 			userInfoUrl: "https://open.feishu.cn/open-apis/authen/v1/user_info",
 			clientId: "feishu-client-id",
 			clientSecret: "feishu-client-secret",
-			scopes: ["contact:user.email"],
+			scopes: ["contact:user.email:readonly"],
 		});
 		expect(larkProvider).toMatchObject({
 			providerId: "lark",
@@ -86,7 +86,7 @@ describe("Feishu/Lark generic OAuth provider helpers", () => {
 				refresh_token_expires_in: 7200,
 				token_type: "Bearer",
 				expires_in: 3600,
-				scope: "contact:user.email contact:user.employee_id",
+				scope: "contact:user.email:readonly contact:user.employee_id:readonly",
 			});
 		});
 
@@ -100,7 +100,10 @@ describe("Feishu/Lark generic OAuth provider helpers", () => {
 			accessToken: "feishu-access-token",
 			refreshToken: "feishu-refresh-token",
 			tokenType: "Bearer",
-			scopes: ["contact:user.email", "contact:user.employee_id"],
+			scopes: [
+				"contact:user.email:readonly",
+				"contact:user.employee_id:readonly",
+			],
 		});
 		expect(tokens?.accessTokenExpiresAt).toBeInstanceOf(Date);
 		expect(tokens?.refreshTokenExpiresAt).toBeInstanceOf(Date);
@@ -187,7 +190,7 @@ describe("Feishu/Lark generic OAuth provider helpers", () => {
 				code: 0,
 				access_token: "refreshed-access-token",
 				refresh_token: "refreshed-refresh-token",
-				scope: "contact:user.email",
+				scope: "contact:user.email:readonly",
 			});
 		});
 
@@ -196,7 +199,7 @@ describe("Feishu/Lark generic OAuth provider helpers", () => {
 		expect(tokens).toMatchObject({
 			accessToken: "refreshed-access-token",
 			refreshToken: "refreshed-refresh-token",
-			scopes: ["contact:user.email"],
+			scopes: ["contact:user.email:readonly"],
 		});
 	});
 });
