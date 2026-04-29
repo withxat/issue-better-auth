@@ -3,6 +3,7 @@ import { betterFetch } from "@better-fetch/fetch";
 import type { BaseOAuthProviderOptions, GenericOAuthConfig } from "../index";
 
 const OAUTH_SCOPE_SPLIT_RE = /\s+/;
+const FEISHU_OPEN_ID_SANITIZE_RE = /[^a-zA-Z0-9._-]/g;
 
 interface FeishuEndpoints {
 	authorizationUrl: string;
@@ -165,11 +166,13 @@ function mapFeishuProfile(profile: FeishuProfile): OAuth2UserInfo | null {
 	if (!openId) {
 		return null;
 	}
+	const email = data.email?.trim() || data.enterprise_email?.trim();
+	const name = data.name?.trim() || data.en_name?.trim() || openId;
 
 	return {
 		id: data.union_id || openId,
-		name: data.name || data.en_name || openId,
-		email: data.email || data.enterprise_email || null,
+		name,
+		email: email || syntheticFeishuEmail(openId),
 		image:
 			data.avatar_url ||
 			data.avatar_big ||
@@ -177,6 +180,11 @@ function mapFeishuProfile(profile: FeishuProfile): OAuth2UserInfo | null {
 			data.avatar_thumb,
 		emailVerified: false,
 	};
+}
+
+function syntheticFeishuEmail(openId: string): string {
+	const safe = openId.replace(FEISHU_OPEN_ID_SANITIZE_RE, "_");
+	return `feishu.${safe}@oauth.local`;
 }
 
 function createFeishuProvider<ID extends "feishu" | "lark">({

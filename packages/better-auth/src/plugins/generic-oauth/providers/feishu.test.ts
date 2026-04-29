@@ -173,6 +173,36 @@ describe("Feishu/Lark generic OAuth provider helpers", () => {
 		});
 	});
 
+	it("uses a synthetic email when Feishu omits email fields", async () => {
+		const provider = feishu({
+			clientId: "feishu-client-id",
+			clientSecret: "feishu-client-secret",
+		});
+
+		mockedFetch.mockResolvedValueOnce(
+			Response.json({
+				code: 0,
+				data: {
+					en_name: "Fallback User",
+					open_id: "ou_feishu:user/123",
+					avatar_thumb: "https://example.com/avatar-thumb.png",
+				},
+			}),
+		);
+
+		const userInfo = await provider.getUserInfo?.({
+			accessToken: "feishu-access-token",
+		});
+
+		expect(userInfo).toEqual({
+			id: "ou_feishu:user/123",
+			name: "Fallback User",
+			email: "feishu.ou_feishu_user_123@oauth.local",
+			image: "https://example.com/avatar-thumb.png",
+			emailVerified: false,
+		});
+	});
+
 	it("refreshes Feishu tokens with the provider JSON token request", async () => {
 		const provider = feishu({
 			clientId: "feishu-client-id",
